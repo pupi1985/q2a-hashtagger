@@ -1,0 +1,14 @@
+{
+    "name": "Hashtagger",
+    "uri": "https://github.com/pupi1985/q2a-hashtagger",
+    "description": "Automatically convert hashtags (#some_word#) and mentions (@some_name) into HTML links",
+    "version": "1.2.0",
+    "date": "2018-07-21",
+    "author": "Victor (Extended by pupi1985)",
+    "author_uri": "http://question2answer.org/qa/user/pupi1985",
+    "license": "GPLv3",
+    "update_uri": "https://raw.githubusercontent.com/pupi1985/q2a-hashtagger/master/metadata.json",
+    "min_q2a": "1.7.0",
+    "min_php": "5.1.6",
+    "load_order": "after_db_init"
+}
