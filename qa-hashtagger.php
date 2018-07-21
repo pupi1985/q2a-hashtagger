@@ -153,40 +153,50 @@ class qa_hashtagger
      */
     public function process_event($event, $userid, $handle, $cookieid, $params)
     {
-        if (self::$userids && self::$notification) {
-            if (self::$notification['question_id']) {
-                if (!self::$notification['anchor_id']) {
-                    self::$notification['anchor_id'] = $params['postid'];
-                }
-            } else {
-                self::$notification['question_id'] = isset($params['parentid']) ? $params['parentid'] : $params['postid'];
+        if (empty(self::$userids) && empty(self::$notification)) {
+            return;
+        }
+
+        // For qa_send_notification()
+        require_once QA_INCLUDE_DIR . 'app/emails.php';
+
+        // For qa_db_event_create_not_entity()
+        require_once QA_INCLUDE_DIR . 'db/events.php';
+
+        if (self::$notification['question_id']) {
+            if (!self::$notification['anchor_id']) {
+                self::$notification['anchor_id'] = $params['postid'];
             }
+        } else {
+            self::$notification['question_id'] = isset($params['parentid']) ? $params['parentid'] : $params['postid'];
+        }
 
-            $this->load('qa-app-emails', 'qa_send_notification');
-            $this->load('qa-db-events', 'qa_db_event_create_not_entity');
+        $subject = qa_lang('plugin_hashtagger/user_mentioned_title');
+        $body = qa_lang('plugin_hashtagger/user_mentioned_body');
 
-            $subject = qa_lang('plugin_hashtagger/user_mentioned_title');
-            $body = qa_lang('plugin_hashtagger/user_mentioned_body');
+        $mentioned_url = qa_q_path(
+            self::$notification['question_id'],
+            self::$notification['question_title'],
+            true,
+            self::$notification['anchor_type'],
+            self::$notification['anchor_id']
+        );
 
-            $mentioned_url = qa_q_path(self::$notification['question_id'], self::$notification['question_title'], true
-                , self::$notification['anchor_type'], self::$notification['anchor_id']);
-
-            foreach (self::$userids as $userid) {
-                /**
-                 * @todo - create an event for /updates/ page using qa_db_event_create_not_entity()
-                 *
-                 * At this moment we cannot do this, because qa_other_to_q_html_fields() does not accept
-                 * custom event types, thus on /updates/ page cannot shown suitable message for user
-                 *
-                 * The only thing to do this, is to override qa_other_to_q_html_fields() function
-                 * but it's too bad idea because it is necessary to copy the entire function
-                 */
-                qa_send_notification($userid, null, null, $subject, $body, array(
-                    '^author_name' => self::$notification['auhtor_name'],
-                    '^question_title' => self::$notification['question_title'],
-                    '^mentioned_url' => $mentioned_url,
-                ));
-            }
+        foreach (self::$userids as $userid) {
+            /**
+             * @todo - create an event for /updates/ page using qa_db_event_create_not_entity()
+             *
+             * At this moment we cannot do this, because qa_other_to_q_html_fields() does not accept
+             * custom event types, thus on /updates/ page cannot shown suitable message for user
+             *
+             * The only thing to do this, is to override qa_other_to_q_html_fields() function
+             * but it's too bad idea because it is necessary to copy the entire function
+             */
+            qa_send_notification($userid, null, null, $subject, $body, array(
+                '^author_name' => self::$notification['auhtor_name'],
+                '^question_title' => self::$notification['question_title'],
+                '^mentioned_url' => $mentioned_url,
+            ));
         }
     }
 
@@ -242,35 +252,27 @@ class qa_hashtagger
     {
         $this->init_filter($row, $type);
 
-        if (self::$hashtags) {
-            $this->load('qa-util-string', 'qa_tagstring_to_tags');
-            $this->load('qa-app-posts', 'qa_post_set_content');
-
-            $old_question['tags'] = qa_tagstring_to_tags($old_question['tags']);
-            $new_question = $this->set_question_tags($old_question);
-
-            if ($new_question['tags'] != $old_question['tags']) {
-                qa_post_set_content(
-                    $new_question['postid']
-                    , $new_question['title']
-                    , $new_question['content']
-                    , $new_question['format']
-                    , $new_question['tags']
-                );
-            }
+        if (empty(self::$hashtags)) {
+            return;
         }
-    }
 
-    /**
-     * Load specified file if function does not exists
-     *
-     * @param string $file
-     * @param string $fn
-     */
-    private function load($file, $fn)
-    {
-        if (!function_exists($fn)) {
-            require_once QA_INCLUDE_DIR . "{$file}.php";
+        // For qa_tagstring_to_tags()
+        require_once QA_INCLUDE_DIR . 'util/string.php';
+
+        // For qa_post_set_content()
+        require_once QA_INCLUDE_DIR . 'app/posts.php';
+
+        $old_question['tags'] = qa_tagstring_to_tags($old_question['tags']);
+        $new_question = $this->set_question_tags($old_question);
+
+        if ($new_question['tags'] != $old_question['tags']) {
+            qa_post_set_content(
+                $new_question['postid'],
+                $new_question['title'],
+                $new_question['content'],
+                $new_question['format'],
+                $new_question['tags']
+            );
         }
     }
 
@@ -309,7 +311,9 @@ class qa_hashtagger
      */
     private static function build_tag_link($match)
     {
-        $hashtag = mb_strtolower($match['word'], 'UTF-8');
+        require_once QA_INCLUDE_DIR . 'util/string.php';
+
+        $hashtag = qa_strtolower($match['word'], 'UTF-8');
         if (qa_opt('plugin_hashtagger/keep_hash_symbol')) {
             $hashtag = "#{$hashtag}";
         }
@@ -355,7 +359,7 @@ class qa_hashtagger
      */
     private function is_convertable($type, $char, $str)
     {
-        return (qa_opt("plugin_hashtagger/convert_{$type}") && strpos($str, $char) !== false);
+        return qa_opt("plugin_hashtagger/convert_{$type}") && strpos($str, $char) !== false;
     }
 
     /**
@@ -382,7 +386,7 @@ class qa_hashtagger
     {
         // We need to process only non-empty content
         if (empty($row['content']) || !qa_opt("plugin_hashtagger/filter_{$type}")) {
-            return false;
+            return;
         }
 
         $convert_hashtags = $this->is_convertable('hashtags', '#', $row['content']);
@@ -390,7 +394,7 @@ class qa_hashtagger
 
         // Skip message if does not have any convertable options
         if (!$convert_hashtags && !$convert_usernames) {
-            return false;
+            return;
         }
 
         // Redefine variables
@@ -417,8 +421,8 @@ class qa_hashtagger
             $row['content'] = $this->preg_call('%<b64>(.*?)</b64>%', 'show_html_links', $row['content']);
         }
 
-        // Let's force the object to use HTML format if was builded new links
-        if (self::$hashtags || self::$userids) {
+        // Let's force the object to use HTML format if it has created links
+        if (!empty(self::$hashtags) || !empty(self::$userids)) {
             $row['format'] = 'html';
         }
     }
