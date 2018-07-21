@@ -408,12 +408,13 @@ class qa_hashtagger
 
         // Convert hashtags
         if ($convert_hashtags) {
-            $row['content'] = $this->preg_call('%#(?P<word>[\w\-]+)%u', 'build_tag_link', $row['content']);
+            $row['content'] = $this->preg_call('%#(?P<word>[\w\-]*?)#%u', 'build_tag_link', $row['content']);
         }
 
         // Convert usernames
         if ($convert_usernames) {
             $row['content'] = $this->preg_call('%@(?P<name>[\w\-]+)%u', 'build_user_link', $row['content']);
+            $row['content'] = $this->preg_call('%@"(?P<name>.*?)"%u', 'build_user_link', $row['content']);
         }
 
         // Unhide links
