@@ -1,4 +1,4 @@
-Hashtagger [by Victor (extended by [Gabriel Zanetti][author]]
+Hashtagger [by Victor (extended by [Gabriel Zanetti][author])]
 =================================================
 
 Description
