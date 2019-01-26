@@ -2,7 +2,6 @@
 
 class qa_hashtagger
 {
-
     /**
      * The list of hashtags found in contents of Questions, Comments or Answers
      *
@@ -313,18 +312,18 @@ class qa_hashtagger
     {
         require_once QA_INCLUDE_DIR . 'util/string.php';
 
-        $hashtag = qa_strtolower($match['word'], 'UTF-8');
-        if (qa_opt('plugin_hashtagger/keep_hash_symbol')) {
-            $hashtag = "#{$hashtag}";
+        $tag = qa_strtolower($match['word']);
+
+        $linkText = qa_opt('plugin_hashtagger/keep_hash_symbol') ? "#" : '';
+        $linkText .= $tag;
+
+        if (!in_array($tag, self::$hashtags)) {
+            self::$hashtags[] = $tag;
         }
 
-        if (!in_array($hashtag, self::$hashtags)) {
-            self::$hashtags[] = $hashtag;
-        }
+        $url = qa_path_html('tag/' . $tag);
 
-        $url = qa_path_html("tag/{$hashtag}");
-
-        return "<a href='{$url}'>#{$match['word']}</a>";
+        return sprintf('<a href="%s">%s</a>', $url, $linkText);
     }
 
     /**
