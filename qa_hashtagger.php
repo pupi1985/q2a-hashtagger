@@ -306,30 +306,33 @@ class qa_hashtagger
         self::$hashtags = array();
         self::$userids = array();
 
+        $htmlContent = qa_html($row['content'], true);
+
         // Hide links
-        if (stripos($row['content'], '</a>') !== false) {
-            $row['content'] = $this->preg_call('%(<a.*?</a>)%i', 'hide_html_links', $row['content']);
+        if (stripos($htmlContent, '</a>') !== false) {
+            $htmlContent = $this->preg_call('%(<a.*?</a>)%i', 'hide_html_links', $htmlContent);
         }
 
         // Convert hashtags
         if ($convert_hashtags) {
-            $row['content'] = $this->preg_call('%#(?P<word>[\w\-]*?)#%u', 'build_tag_link', $row['content']);
+            $htmlContent = $this->preg_call('%#(?P<word>[\w\-]*?)#%u', 'build_tag_link', $htmlContent);
         }
 
         // Convert usernames
         if ($convert_usernames) {
-            $row['content'] = $this->preg_call('%@(?P<name>[\w\-]+)%u', 'build_user_link', $row['content']);
-            $row['content'] = $this->preg_call('%@"(?P<name>.*?)"%u', 'build_user_link', $row['content']);
+            $htmlContent = $this->preg_call('%@(?P<name>[\w\-]+)%u', 'build_user_link', $htmlContent);
+            $htmlContent = $this->preg_call('%@"(?P<name>.*?)"%u', 'build_user_link', $htmlContent);
         }
 
         // Unhide links
-        if (strpos($row['content'], '</b64>') !== false) {
-            $row['content'] = $this->preg_call('%<b64>(.*?)</b64>%', 'show_html_links', $row['content']);
+        if (strpos($htmlContent, '</b64>') !== false) {
+            $htmlContent = $this->preg_call('%<b64>(.*?)</b64>%', 'show_html_links', $htmlContent);
         }
 
         // Let's force the object to use HTML format if it has created links
         if (!empty(self::$hashtags) || !empty(self::$userids)) {
             $row['format'] = 'html';
+            $row['content'] = $htmlContent;
         }
     }
 }
