@@ -227,7 +227,7 @@ class qa_hashtagger
             self::$hashtags[] = $tag;
         }
 
-        $url = qa_path_html('tag/' . $tag);
+        $url = qa_html(qa_path_absolute('tag/' . $tag));
 
         return sprintf('<a href="%s">%s</a>', $url, $linkText);
     }
@@ -244,9 +244,9 @@ class qa_hashtagger
         $userid = qa_handle_to_userid($match['name']);
         if ($userid) {
             self::$userids[] = $userid;
-            $url = qa_path_html("user/{$match['name']}");
+            $url = qa_html(qa_path_absolute('user/' . $match['name']));
 
-            return "<a href='{$url}'>@{$match['name']}</a>";
+            return sprintf('<a href="%s">%s</a>', $url, $match['name']);
         } else {
             // If user does not exists in DB the string is returned as is
             return $match[0];
