@@ -2,6 +2,9 @@
 
 class qa_hashtagger
 {
+    const MENTION_TYPE_HASHTAGS = 'hashtags';
+    const MENTION_TYPE_USERNAMES = 'usernames';
+
     /**
      * The list of hashtags found in contents of Questions, Comments or Answers
      *
@@ -24,74 +27,6 @@ class qa_hashtagger
     private static $notification;
 
     /**
-     * The list of options names (these options have boolean values)
-     *
-     * @var array
-     */
-    private static $bool_options = array(
-        'plugin_hashtagger/filter_questions',
-        'plugin_hashtagger/filter_comments',
-        'plugin_hashtagger/filter_answers',
-        'plugin_hashtagger/convert_hashtags',
-        'plugin_hashtagger/keep_hash_symbol',
-        'plugin_hashtagger/convert_usernames',
-        'plugin_hashtagger/notify_users',
-    );
-
-    /**
-     * Get the default option value
-     *
-     * @param string $option
-     *
-     * @return boolean
-     */
-    public function option_default($option)
-    {
-        return in_array($option, self::$bool_options);
-    }
-
-    /**
-     * Configuration of plugin for admin form
-     *
-     * @param array $qa_content
-     *
-     * @return array
-     */
-    public function admin_form(&$qa_content)
-    {
-        // Check if we should save options
-        $save_options = qa_clicked('plugin_hashtagger_save_button');
-
-        // Define default form variables
-        $config = array(
-            'buttons' => array(
-                array(
-                    'label' => qa_lang('plugin_hashtagger/save_changes'),
-                    'tags' => 'NAME="plugin_hashtagger_save_button"',
-                ),
-            ),
-            'fields' => array(),
-            'ok' => $save_options ? qa_lang('plugin_hashtagger/options_saved') : null,
-        );
-
-        // Build and save options
-        foreach (self::$bool_options as $name) {
-            if ($save_options) {
-                qa_opt($name, (bool)qa_post_text($name));
-            }
-
-            $config['fields'][] = array(
-                'label' => qa_lang($name),
-                'type' => 'checkbox',
-                'value' => qa_opt($name),
-                'tags' => "NAME='{$name}'",
-            );
-        }
-
-        return $config;
-    }
-
-    /**
      * Filter question
      *
      * @param array $question
@@ -100,11 +35,13 @@ class qa_hashtagger
      */
     public function filter_question(&$question, &$errors, $oldquestion)
     {
-        if (!$errors) {
-            $this->set_notification($question, $oldquestion, 'Q');
-            $this->init_filter($question, 'questions');
-            $question = $this->set_question_tags($question);
+        if ($errors) {
+            return;
         }
+
+        $this->set_notification($question, $oldquestion, 'Q');
+        $this->init_filter($question, 'questions');
+        $question = $this->set_question_tags($question);
     }
 
     /**
@@ -117,10 +54,12 @@ class qa_hashtagger
      */
     public function filter_answer(&$answer, &$errors, $question, $oldanswer)
     {
-        if (!$errors) {
-            $this->set_notification($question, $oldanswer, 'A');
-            $this->filter_question_child($answer, $question, 'answers');
+        if ($errors) {
+            return;
         }
+
+        $this->set_notification($question, $oldanswer, 'A');
+        $this->filter_question_child($answer, $question, 'answers');
     }
 
     /**
@@ -134,10 +73,12 @@ class qa_hashtagger
      */
     public function filter_comment(&$comment, &$errors, $question, $parent, $oldcomment)
     {
-        if (!$errors) {
-            $this->set_notification($question, $oldcomment, 'C');
-            $this->filter_question_child($comment, $question, 'comments');
+        if ($errors) {
+            return;
         }
+
+        $this->set_notification($question, $oldcomment, 'C');
+        $this->filter_question_child($comment, $question, 'comments');
     }
 
     /**
@@ -350,15 +291,15 @@ class qa_hashtagger
     /**
      * Check if option is enabled and contains specified character
      *
-     * @param string $type
+     * @param string $mentionType
      * @param string $char
      * @param string $str
      *
      * @return bool
      */
-    private function is_convertable($type, $char, $str)
+    private function is_convertable($mentionType, $char, $str)
     {
-        return qa_opt("plugin_hashtagger/convert_{$type}") && strpos($str, $char) !== false;
+        return qa_opt("plugin_hashtagger/convert_{$mentionType}") && strpos($str, $char) !== false;
     }
 
     /**
@@ -388,8 +329,8 @@ class qa_hashtagger
             return;
         }
 
-        $convert_hashtags = $this->is_convertable('hashtags', '#', $row['content']);
-        $convert_usernames = $this->is_convertable('usernames', '@', $row['content']);
+        $convert_hashtags = $this->is_convertable(self::MENTION_TYPE_HASHTAGS, '#', $row['content']);
+        $convert_usernames = $this->is_convertable(self::MENTION_TYPE_USERNAMES, '@', $row['content']);
 
         // Skip message if does not have any convertable options
         if (!$convert_hashtags && !$convert_usernames) {
@@ -426,5 +367,4 @@ class qa_hashtagger
             $row['format'] = 'html';
         }
     }
-
 }
