@@ -59,7 +59,7 @@ class qa_hashtagger
         }
 
         $this->set_notification($question, $oldanswer, 'A');
-        $this->filter_question_child($answer, $question, 'answers');
+        $this->init_filter($answer, 'answers');
     }
 
     /**
@@ -78,7 +78,7 @@ class qa_hashtagger
         }
 
         $this->set_notification($question, $oldcomment, 'C');
-        $this->filter_question_child($comment, $question, 'comments');
+        $this->init_filter($comment, 'comments');
     }
 
     /**
@@ -179,41 +179,6 @@ class qa_hashtagger
         }
 
         return $question;
-    }
-
-    /**
-     * Filter objects submited to question (like answers or comments)
-     *
-     * @param array $row
-     * @param array $old_question
-     * @param string $type
-     */
-    private function filter_question_child(&$row, $old_question, $type)
-    {
-        $this->init_filter($row, $type);
-
-        if (empty(self::$hashtags)) {
-            return;
-        }
-
-        // For qa_tagstring_to_tags()
-        require_once QA_INCLUDE_DIR . 'util/string.php';
-
-        // For qa_post_set_content()
-        require_once QA_INCLUDE_DIR . 'app/posts.php';
-
-        $old_question['tags'] = qa_tagstring_to_tags($old_question['tags']);
-        $new_question = $this->set_question_tags($old_question);
-
-        if ($new_question['tags'] != $old_question['tags']) {
-            qa_post_set_content(
-                $new_question['postid'],
-                $new_question['title'],
-                $new_question['content'],
-                $new_question['format'],
-                $new_question['tags']
-            );
-        }
     }
 
     /**
