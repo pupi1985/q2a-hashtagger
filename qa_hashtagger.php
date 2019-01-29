@@ -182,7 +182,7 @@ class qa_hashtagger
     }
 
     /**
-     * We should to hide HTML links to prevent "double links"
+     * We should hide HTML links to prevent "double links"
      *
      * @param array $match
      *
@@ -331,7 +331,11 @@ class qa_hashtagger
 
         // Let's force the object to use HTML format if it has created links
         if (!empty(self::$hashtags) || !empty(self::$userids)) {
-            $row['format'] = 'html';
+            if ($row['format'] === 'html') {
+                $htmlContent = html_entity_decode($htmlContent);
+            } else {
+                $row['format'] = 'html';
+            }
             $row['content'] = $htmlContent;
         }
     }
