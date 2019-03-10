@@ -10,7 +10,7 @@ and comments that will turn into HTML links when saving the post.
 Features
 --------
 
- *  Creates links to the user profile when using user mentions like `@pupi1985` or `@"pupi 1985"`
+ *  Creates links to the user profile when using user mentions like `@pupi1985@` or `@pupi 1985@`
  *  Creates links to the tag pages when using user references like `#cars#`
  *  Internationalization support
  *  No need of core hacks or plugin overrides
@@ -30,13 +30,8 @@ Setup comments
 Notes
 -------
 
-User mentions can be performed by just writing `@username` where `username` must be a registered user in the system.
-These kind of mentions only work for user names that have letters, numbers, undescores `_` and dashes `-` in their
-user names.
-
-When trying to mention a user that contains characters not included in the previous list (like spaces), it is
-possible to mention them by using `@"user name"`. It is important to open the quotes immediately next to the `@` and to
-close them. Otherwise, the mention will not be created.
+User mentions can be performed by just writing `@username@` where `username` must be a registered user in the system.
+If the mentioned user contains special characters in their handle just input them exactly as their handle.
 
 Tags can be created by just writing `#tag#` where `tag` could be an existent or a non-existent tag in the system.
 
