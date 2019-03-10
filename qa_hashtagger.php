@@ -122,7 +122,7 @@ class qa_hashtagger
             self::$notification['anchor_id']
         );
 
-        foreach (self::$userids as $userid) {
+        foreach (self::$userids as $userid => $link) {
             /**
              * @todo - create an event for /updates/ page using qa_db_event_create_not_entity()
              *
@@ -236,17 +236,25 @@ class qa_hashtagger
      * Build link to user profile
      *
      * @param array $match
+     * @param boolean $htmlFormat
      *
      * @return string
      */
-    private static function build_user_link($match)
+    private static function build_user_link($match, $htmlFormat)
     {
-        $userid = qa_handle_to_userid($match['name']);
-        if ($userid) {
-            self::$userids[] = $userid;
-            $url = qa_html(qa_path_absolute('user/' . $match['name']));
+        $handle = $match['name'];
 
-            return sprintf('<a href="%s">%s</a>', $url, $match['name']);
+        if ($htmlFormat) {
+            $handle = html_entity_decode($handle);
+            echo $handle;
+        }
+
+        $userid = qa_handle_to_userid($handle);
+        if ($userid) {
+            $url = qa_html(qa_path_absolute('user/' . $handle));
+            self::$userids[$userid] = $url;
+
+            return sprintf('${hashtagger-open-link-user-%s}%s${hashtagger-close-link}', $userid, $handle);
         } else {
             // If user does not exists in DB the string is returned as is
             return $match[0];
@@ -306,7 +314,8 @@ class qa_hashtagger
         self::$hashtags = array();
         self::$userids = array();
 
-        $htmlContent = qa_html($row['content'], true);
+        $htmlContent = $row['content'];
+        $isInHtmlFormat = $row['format'] === 'html';
 
         // Hide links
         if (stripos($htmlContent, '</a>') !== false) {
@@ -315,13 +324,18 @@ class qa_hashtagger
 
         // Convert hashtags
         if ($convert_hashtags) {
-            $htmlContent = $this->preg_call('%#(?P<word>[\w\-]*?)#%u', 'build_tag_link', $htmlContent);
+            $htmlContent = $this->preg_call('%#(?P<word>[\w\-]+?)#%u', 'build_tag_link', $htmlContent);
         }
 
         // Convert usernames
         if ($convert_usernames) {
-            $htmlContent = $this->preg_call('%@(?P<name>[\w\-]+)%u', 'build_user_link', $htmlContent);
-            $htmlContent = $this->preg_call('%@"(?P<name>.*?)"%u', 'build_user_link', $htmlContent);
+            $htmlContent = preg_replace_callback(
+                '%@(?P<name>.+?)[@/+]%u',
+                function ($matches) use ($isInHtmlFormat) {
+                    return self::build_user_link($matches, $isInHtmlFormat);
+                },
+                $htmlContent
+            );
         }
 
         // Unhide links
@@ -329,14 +343,25 @@ class qa_hashtagger
             $htmlContent = $this->preg_call('%<b64>(.*?)</b64>%', 'show_html_links', $htmlContent);
         }
 
-        // Let's force the object to use HTML format if it has created links
-        if (!empty(self::$hashtags) || !empty(self::$userids)) {
-            if ($row['format'] === 'html') {
-                $htmlContent = html_entity_decode($htmlContent);
-            } else {
-                $row['format'] = 'html';
-            }
-            $row['content'] = $htmlContent;
+        if (empty(self::$hashtags) && empty(self::$userids)) {
+            return;
         }
+
+        if (!$isInHtmlFormat) {
+            $htmlContent = qa_html($htmlContent, true);
+        }
+
+        foreach (self::$userids as $userid => $url) {
+            $openLinkSearch = sprintf('${hashtagger-open-link-user-%s}', $userid);
+            $replaceWith = sprintf('<a href="%s">', $url);
+            $htmlContent = str_replace($openLinkSearch, $replaceWith, $htmlContent);
+        }
+        $htmlContent = str_replace('${hashtagger-close-link}', '</a>', $htmlContent);
+
+        // Let's force the object to use HTML format if it has created links
+        if (!$isInHtmlFormat) {
+            $row['format'] = 'html';
+        }
+        $row['content'] = $htmlContent;
     }
 }
