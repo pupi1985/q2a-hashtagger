@@ -27,6 +27,16 @@ class qa_hashtagger
     private static $notification;
 
     /**
+     * The list of tags to set to the question
+     *
+     * @var array
+     */
+    private static $questionTags;
+
+    /** @var bool */
+    private static $newTagsPresent = false;
+
+    /**
      * Filter question
      *
      * @param array $question
@@ -169,12 +179,12 @@ class qa_hashtagger
      */
     private function set_question_tags($question)
     {
-        if (self::$hashtags) {
+        if (!empty(self::$questionTags)) {
             if (isset($question['tags'])) {
-                $new_tags = array_merge($question['tags'], self::$hashtags);
+                $new_tags = array_merge($question['tags'], self::$questionTags);
                 $question['tags'] = array_unique($new_tags);
             } else {
-                $question['tags'] = self::$hashtags;
+                $question['tags'] = self::$questionTags;
             }
         }
 
@@ -210,26 +220,40 @@ class qa_hashtagger
     /**
      * Build tag link and set it for global variable
      *
-     * @param array $match
+     * @param array $matches
+     * @param boolean $htmlFormat
      *
      * @return string
      */
-    private static function build_tag_link($match)
+    private static function build_tag_link(array $matches, $htmlFormat)
     {
         require_once QA_INCLUDE_DIR . 'util/string.php';
+        require_once QA_INCLUDE_DIR . 'db/post-create.php';
 
-        $tag = qa_strtolower($match['word']);
+        $tag = qa_strtolower($matches['word']);
+
+        if ($htmlFormat) {
+            $tag = html_entity_decode($tag);
+        }
 
         $linkText = qa_opt('plugin_hashtagger/keep_hash_symbol') ? "#" : '';
         $linkText .= $tag;
 
-        if (!in_array($tag, self::$hashtags)) {
-            self::$hashtags[] = $tag;
+        $tagWord = qa_db_single_select(qa_db_tag_word_selectspec($tag));
+
+        self::$questionTags[] = $tag;
+
+        if (is_null($tagWord)) {
+            $tagWord = qa_db_word_mapto_ids_add(array($tagWord));
         }
 
         $url = qa_html(qa_path_absolute('tag/' . $tag));
 
-        return sprintf('<a href="%s">%s</a>', $url, $linkText);
+        if (!in_array($tag, self::$hashtags)) {
+            self::$hashtags[$tagWord['wordid']] = $url;
+        }
+
+        return sprintf('${hashtagger-open-link-tag-%s}%s${hashtagger-close-link}', $tagWord['wordid'], $linkText);
     }
 
     /**
@@ -240,13 +264,12 @@ class qa_hashtagger
      *
      * @return string
      */
-    private static function build_user_link($match, $htmlFormat)
+    private static function build_user_link(array $match, $htmlFormat)
     {
         $handle = $match['name'];
 
         if ($htmlFormat) {
             $handle = html_entity_decode($handle);
-            echo $handle;
         }
 
         $userid = qa_handle_to_userid($handle);
@@ -313,6 +336,7 @@ class qa_hashtagger
         // Redefine variables
         self::$hashtags = array();
         self::$userids = array();
+        self::$questionTags = array();
 
         $htmlContent = $row['content'];
         $isInHtmlFormat = $row['format'] === 'html';
@@ -324,18 +348,12 @@ class qa_hashtagger
 
         // Convert hashtags
         if ($convert_hashtags) {
-            $htmlContent = $this->preg_call('%#(?P<word>[\w\-]+?)#%u', 'build_tag_link', $htmlContent);
+            $htmlContent = $this->parseTags($isInHtmlFormat, $htmlContent);
         }
 
         // Convert usernames
         if ($convert_usernames) {
-            $htmlContent = preg_replace_callback(
-                '%@(?P<name>.+?)[@/+]%u',
-                function ($matches) use ($isInHtmlFormat) {
-                    return self::build_user_link($matches, $isInHtmlFormat);
-                },
-                $htmlContent
-            );
+            $htmlContent = $this->parseUsers($isInHtmlFormat, $htmlContent);
         }
 
         // Unhide links
@@ -351,17 +369,94 @@ class qa_hashtagger
             $htmlContent = qa_html($htmlContent, true);
         }
 
-        foreach (self::$userids as $userid => $url) {
-            $openLinkSearch = sprintf('${hashtagger-open-link-user-%s}', $userid);
-            $replaceWith = sprintf('<a href="%s">', $url);
-            $htmlContent = str_replace($openLinkSearch, $replaceWith, $htmlContent);
-        }
-        $htmlContent = str_replace('${hashtagger-close-link}', '</a>', $htmlContent);
+        $htmlContent = $this->updateUsers($htmlContent);
+        $htmlContent = $this->updateTags($htmlContent);
+        $htmlContent = $this->updateCloseTags($htmlContent);
 
         // Let's force the object to use HTML format if it has created links
         if (!$isInHtmlFormat) {
             $row['format'] = 'html';
         }
         $row['content'] = $htmlContent;
+    }
+
+    /**
+     * @param bool $isInHtmlFormat
+     * @param string $htmlContent
+     *
+     * @return string
+     */
+    private function parseTags($isInHtmlFormat, $htmlContent)
+    {
+        $htmlContent = preg_replace_callback(
+            '%#(?P<word>[\w\-]+?)#%u',
+            function ($matches) use ($isInHtmlFormat) {
+                return self::build_tag_link($matches, $isInHtmlFormat);
+            },
+            $htmlContent
+        );
+
+        return $htmlContent;
+    }
+
+    /**
+     * @param bool $isInHtmlFormat
+     * @param string $htmlContent
+     *
+     * @return string
+     */
+    private function parseUsers($isInHtmlFormat, $htmlContent)
+    {
+        $htmlContent = preg_replace_callback(
+            '%@(?P<name>.+?)[@/+]%u',
+            function ($matches) use ($isInHtmlFormat) {
+                return self::build_user_link($matches, $isInHtmlFormat);
+            },
+            $htmlContent
+        );
+
+        return $htmlContent;
+    }
+
+    /**
+     * @param string $htmlContent
+     *
+     * @return string
+     */
+    private function updateUsers($htmlContent)
+    {
+        foreach (self::$userids as $userid => $url) {
+            $openLinkSearch = sprintf('${hashtagger-open-link-user-%s}', $userid);
+            $replaceWith = sprintf('<a href="%s">', $url);
+            $htmlContent = str_replace($openLinkSearch, $replaceWith, $htmlContent);
+        }
+
+        return $htmlContent;
+    }
+
+    /**
+     * @param string $htmlContent
+     *
+     * @return string
+     */
+    public function updateTags($htmlContent)
+    {
+        foreach (self::$hashtags as $tagId => $url) {
+            $openLinkSearch = sprintf('${hashtagger-open-link-tag-%s}', $tagId);
+            $replaceWith = sprintf('<a href="%s">', $url);
+            $htmlContent = str_replace($openLinkSearch, $replaceWith, $htmlContent);
+        }
+
+        return $htmlContent;
+    }
+
+    /**
+     * @param $htmlContent
+     *
+     * @return string
+     */
+    public function updateCloseTags($htmlContent)
+    {
+        return str_replace('${hashtagger-close-link}', '</a>', $htmlContent);
     }
 }
