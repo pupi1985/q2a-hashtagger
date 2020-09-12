@@ -1,9 +1,9 @@
 {
     "name": "Hashtagger",
     "uri": "https://github.com/pupi1985/q2a-hashtagger",
-    "description": "Automatically convert hashtags (#some_word#) and mentions (@some_name) into HTML links",
-    "version": "1.2.5",
-    "date": "2019-03-10",
+    "description": "Automatically convert hashtags (#some_word#) and mentions (@some_name@) into HTML links",
+    "version": "1.2.6",
+    "date": "2020-09-12",
     "author": "Victor (Extended by pupi1985)",
     "author_uri": "http://question2answer.org/qa/user/pupi1985",
     "license": "GPLv3",
